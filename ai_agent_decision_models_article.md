@@ -165,7 +165,7 @@ The measurements will help answer those questions.
 
 I'll share the implementation, evaluation methodology, and results on GitHub.
 
-**GitHub:** [Insert repository link]
+**GitHub:** [https://github.com/PrasanthiDesiraju/decisionModelJEV.git]
 
 ## Where I Landed
 
