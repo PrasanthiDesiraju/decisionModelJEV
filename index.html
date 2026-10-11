@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intent Classifier</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f1f5f3; --surface: #fff; --text: #172522; --muted: #60716c;
+    --line: #d6e0dc; --accent: #0c6b5d; --accent-soft: #dff1eb;
+    --orange: #bd5b33; --orange-soft: #fae9df; --good: #18734f;
+    --good-soft: #e3f4ec; --warn: #9b511c; --warn-soft: #fff0df;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1280px; margin: 0 auto; padding: 30px 24px 56px; }
+  .masthead { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 22px; }
+  h1 { font-size: 25px; margin: 0; }
+  .sub { color: var(--muted); margin: 3px 0 0; }
+  .layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); grid-template-areas: "controls compose" "controls results"; gap: 16px 20px; align-items: start; }
+  .compose { grid-area: compose; }
+  .controls { grid-area: controls; position: sticky; top: 16px; }
+  .results { grid-area: results; min-width: 0; }
+  .surface { background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 18px; }
+  .section-title { font-size: 15px; margin: 0 0 12px; }
+  textarea { display: block; width: 100%; min-height: 108px; padding: 12px; font: inherit; color: var(--text); background: #fbfdfc; border: 1px solid var(--line); border-radius: 5px; resize: vertical; }
+  textarea:focus, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .examples { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 0; }
+  .examples button { font: inherit; font-size: 12px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; text-align: left; }
+  .examples button:hover { border-color: var(--accent); color: var(--accent); }
+  .controls .surface + .surface { margin-top: 12px; }
+  .control-group + .control-group { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px; }
+  .control-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: var(--text); font-size: 13px; font-weight: 600; }
+  .control-label output { color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type="range"] { display: block; width: 100%; accent-color: var(--accent); }
+  .hint { color: var(--muted); font-size: 12px; font-weight: 400; }
+  .model-group { margin-top: 14px; }
+  .model-group-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 650; }
+  .model-group-head span { color: var(--muted); font-size: 12px; font-weight: 400; }
+  .model-list { display: grid; gap: 3px; max-height: 240px; overflow: auto; padding: 2px; }
+  .model-option { display: flex; align-items: flex-start; gap: 8px; padding: 5px 7px; border-radius: 4px; color: var(--text); font-size: 12px; overflow-wrap: anywhere; cursor: pointer; }
+  .model-option:hover { background: #edf4f1; }
+  .model-option input { margin: 3px 0 0; accent-color: var(--accent); flex: none; }
+  .catalog-note { margin: 8px 0 0; }
+  .run { width: 100%; margin-top: 14px; padding: 11px 14px; border: 0; border-radius: 5px; color: #fff; background: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
+  .run:hover { background: #09564b; }
+  .run:disabled { opacity: .65; cursor: wait; }
+  .status { min-height: 21px; margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+  .status.error, .result-error { color: var(--warn); }
+  .results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 2px 0 10px; }
+  .results-head h2 { margin: 0; font-size: 17px; }
+  .result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 12px; }
+  .result-card { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 6px; padding: 14px; }
+  .result-card.jev { border-top-color: var(--orange); }
+  .result-card.openai { border-top-color: #426d9b; }
+  .result-card h3 { margin: 0 0 10px; font-size: 14px; }
+  .verdict { padding: 11px; border-radius: 4px; overflow-wrap: anywhere; background: var(--good-soft); color: var(--good); }
+  .verdict.abstain { background: var(--warn-soft); color: var(--warn); }
+  .verdict strong { display: block; margin-top: 2px; font: 700 17px/1.35 ui-monospace, Consolas, monospace; }
+  .result-meta { display: flex; flex-wrap: wrap; gap: 5px 10px; margin: 10px 0; color: var(--muted); font-size: 12px; }
+  .bar-row { display: grid; grid-template-columns: minmax(0, 1fr) 48px; gap: 4px 10px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); }
+  .bar-label { font: 600 12px/1.35 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+  .bar-rationale { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+  .score { text-align: right; font: 12px ui-monospace, Consolas, monospace; }
+  .bar-track { grid-column: 1 / -1; height: 5px; background: #e8eeeb; border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #83a49a; }
+  .result-card.local .bar-row.top .bar-fill { background: var(--accent); }
+  .result-card.jev .bar-row.top .bar-fill { background: var(--orange); }
+  .result-card.openai .bar-row.top .bar-fill { background: #426d9b; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 12px; margin-top: 8px; }
+  .jev-diagnostics { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .jev-diagnostics summary { color: var(--orange); }
+  .jev-diagnostics pre { max-height: 300px; overflow: auto; margin: 8px 0 0; padding: 10px; border-radius: 4px; background: #f4f7f6; color: var(--text); font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .result-error { font-size: 13px; overflow-wrap: anywhere; }
+  .empty-state { min-height: 120px; display: grid; place-items: center; padding: 20px; border: 1px dashed #bac9c3; border-radius: 6px; color: var(--muted); text-align: center; }
+  .results-tools { display: flex; align-items: center; gap: 8px; }
+  .view-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+  .view-toggle button, .tool-button { font: inherit; font-size: 12px; padding: 5px 11px; border: 0; background: var(--surface); color: var(--muted); cursor: pointer; }
+  .view-toggle button + button { border-left: 1px solid var(--line); }
+  .view-toggle button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+  .tool-button { border: 1px solid var(--line); border-radius: 5px; color: var(--accent); }
+  .tool-button:disabled { color: var(--muted); opacity: .6; cursor: default; }
+  .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .compare-table th, .compare-table td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  .compare-table th { background: #f6f9f8; color: var(--muted); font-size: 12px; font-weight: 650; white-space: nowrap; }
+  .compare-table td.num, .compare-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .compare-table tbody tr:last-child td { border-bottom: 0; }
+  .compare-table tfoot td { background: #f6f9f8; font-weight: 650; border-top: 1px solid var(--line); border-bottom: 0; }
+  .compare-table .intent { font: 600 12px/1.35 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+  .compare-table .sub-value { display: block; color: var(--muted); font-size: 11px; font-weight: 400; }
+  .compare-table .model-cell { min-width: 160px; overflow-wrap: anywhere; }
+  .kind-tag { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 3px; font-size: 11px; font-weight: 650; background: var(--accent-soft); color: var(--accent); }
+  .kind-tag.jev { background: var(--orange-soft); color: var(--orange); }
+  .kind-tag.openai { background: #e4edf6; color: #426d9b; }
+  .compare-table .abstain-tag { color: var(--warn); }
+  .table-note { margin: 8px 2px 0; }
+  .match { font-weight: 650; white-space: nowrap; }
+  .match.yes { color: var(--good); }
+  .match.no { color: var(--warn); }
+  .expected-line { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+  .expected-line .match { margin-left: 4px; }
+  .examples .all-examples { border-style: dashed; color: var(--accent); }
+  .number-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .number-row label { display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
+  .number-row input { width: 100%; padding: 7px 9px; font: inherit; font-weight: 400; color: var(--text); background: #fbfdfc; border: 1px solid var(--line); border-radius: 5px; }
+  .batch-stats { margin: 0 0 10px; padding: 8px 10px; border-radius: 4px; background: #f4f7f6; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .run-list { margin: 6px 0 0; padding-left: 20px; font-size: 12px; color: var(--muted); }
+  .run-list li { overflow-wrap: anywhere; }
+  .latency-warning { margin: 0 0 10px; padding: 7px 10px; border-radius: 4px; background: var(--warn-soft); color: var(--warn); font-size: 12px; }
+  .full-only, .print-meta { display: none; }
+  body.table-full main { max-width: none; }
+  body.table-full .masthead, body.table-full .compose, body.table-full .controls,
+  body.table-full .view-toggle, body.table-full #downloadCsv, body.table-full #fullSize { display: none; }
+  body.table-full .layout { display: block; }
+  body.table-full .full-only { display: inline-block; }
+  body.table-full .print-meta { display: block; margin: 0 0 10px; }
+  body.table-full .compare-table { font-size: 14px; }
+  [hidden] { display: none !important; }
+  @media print {
+    @page { size: landscape; margin: 12mm; }
+    body { background: #fff; font-size: 12px; }
+    main { max-width: none; padding: 0; }
+    .masthead, .compose, .controls, .results-tools { display: none !important; }
+    .layout { display: block; }
+    .print-meta { display: block; margin: 0 0 8px; }
+    .table-wrap { overflow: visible; border: 0; }
+    .compare-table { font-size: 11px; }
+    .compare-table th, .compare-table td { padding: 5px 7px; }
+    .compare-table tr { break-inside: avoid; }
+    .compare-table th, .compare-table tfoot td, .kind-tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .result-card { break-inside: avoid; }
+  }
+  @media (max-width: 800px) {
+    main { padding: 22px 16px 40px; }
+    .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "compose" "controls" "results"; }
+    .controls { position: static; }
+  }
+  @media (max-width: 560px) {
+    .masthead { display: block; }
+    .result-grid { grid-template-columns: minmax(0, 1fr); }
+    .surface { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="masthead">
+    <div>
+      <h1>Intent Classifier</h1>
+      <p class="sub">Run one classifier or compare selected embedding, JEV, and OpenAI models.</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <section class="compose surface" aria-labelledby="messageTitle">
+      <h2 class="section-title" id="messageTitle">Customer message</h2>
+      <textarea id="message" placeholder="e.g. My money hasn't reached my friend yet">My bank transfer is still pending. When will it arrive?</textarea>
+      <p class="hint">Shift+Enter adds a line. Each non-empty line is sent as a separate message.</p>
+      <div class="examples" id="examples" aria-label="Example messages"></div>
+    </section>
+
+    <aside class="controls" id="controlPanel" aria-label="Classification settings">
+      <section class="surface">
+        <h2 class="section-title">Choose models</h2>
+        <div class="model-group">
+          <div class="model-group-head">Local embeddings <span id="embeddingCount">3 available</span></div>
+          <div class="model-list" id="embeddingOptions">
+            <label class="model-option"><input type="checkbox" data-kind="local" value="all-MiniLM-L6-v2" checked><span>all-MiniLM-L6-v2</span></label>
+            <label class="model-option"><input type="checkbox" data-kind="local" value="all-mpnet-base-v2"><span>all-mpnet-base-v2</span></label>
+            <label class="model-option"><input type="checkbox" data-kind="local" value="multi-qa-mpnet-base-dot-v1"><span>multi-qa-mpnet-base-dot-v1</span></label>
+          </div>
+        </div>
+        <div class="model-group">
+          <div class="model-group-head">JEV</div>
+          <label class="model-option"><input type="checkbox" data-kind="jev" value="jev"><span>TypeSafe JEV · all 77 intents</span></label>
+          <label class="model-option"><input type="checkbox" data-kind="jev" value="jev-shortlist"><span id="jevShortlistLabel">TypeSafe JEV · top 15 shortlist</span></label>
+        </div>
+        <div class="model-group">
+          <div class="model-group-head">OpenAI frontier models <span id="openaiCount">Loading…</span></div>
+          <div class="model-list" id="openaiOptions" aria-live="polite"><p class="hint">Loading models available to your API key…</p></div>
+          <p class="hint catalog-note" id="openaiStatus"></p>
+        </div>
+        <p class="hint catalog-note">Each selected OpenAI model makes a separately billed API call.</p>
+      </section>
+
+      <section class="surface">
+        <h2 class="section-title">Decision settings</h2>
+        <div class="control-group">
+          <label class="control-label" for="threshold">Minimum score <output id="thresholdValue">0.35</output></label>
+          <input id="threshold" type="range" min="0" max="0.8" step="0.01" value="0.35">
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="margin">Minimum top-two gap <output id="marginValue">0.03</output></label>
+          <input id="margin" type="range" min="0" max="0.2" step="0.01" value="0.03">
+        </div>
+        <div class="control-group">
+          <div class="number-row">
+            <label for="repeats">Repeat each message<input id="repeats" type="number" min="1" max="50" value="1"></label>
+            <label for="parallel">Parallel requests<input id="parallel" type="number" min="1" max="10" value="1"></label>
+          </div>
+          <p class="hint">Repeat to average latency. Parallel requests per model simulate concurrent load; keep 1 for clean per-request timings. Every OpenAI and JEV request is billed.</p>
+          <p class="hint" id="requestCount"></p>
+        </div>
+        <button class="run" id="run" type="button">Run selected (1)</button>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </section>
+    </aside>
+
+    <section class="results" aria-labelledby="resultsTitle">
+      <div class="results-head">
+        <h2 id="resultsTitle">Comparison results</h2>
+        <span class="hint" id="resultSummary"></span>
+        <div class="results-tools">
+          <div class="view-toggle" role="group" aria-label="Results view">
+            <button type="button" id="viewCards" aria-pressed="true">Cards</button>
+            <button type="button" id="viewTable" aria-pressed="false">Table</button>
+          </div>
+          <button type="button" class="tool-button" id="downloadCsv" disabled>Download CSV</button>
+          <button type="button" class="tool-button" id="fullSize" disabled>Full size</button>
+          <button type="button" class="tool-button full-only" id="printTable">Print</button>
+          <button type="button" class="tool-button full-only" id="closeFull">Close full size</button>
+        </div>
+      </div>
+      <p class="hint print-meta" id="printMeta"></p>
+      <div class="empty-state" id="emptyState">Choose one or more models to compare predictions for this message.</div>
+      <div class="result-grid" id="resultGrid" hidden></div>
+      <div id="tableView" hidden>
+        <div class="table-wrap">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Top intent</th>
+                <th>2nd intent</th>
+                <th>Correct?</th>
+                <th class="num">Input tokens</th>
+                <th class="num">Output tokens</th>
+                <th class="num">Latency</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+            <tfoot id="tableFoot"></tfoot>
+          </table>
+        </div>
+        <p class="hint table-note">Embedding latency covers encoding the message and matching it to the intents; loading the model and embedding the 77 intent descriptions is one-time setup and is excluded. Remote latency is the full API round trip; for the JEV shortlist it also includes the local shortlist step, shown as a warning under its latency. With repeats or several messages, latency shows the average with p50 and p95, and tokens are averaged per request.</p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const modelFallback = ["all-MiniLM-L6-v2", "all-mpnet-base-v2", "multi-qa-mpnet-base-dot-v1"];
+  let currentView = "cards";
+  let running = false;
+  let jevShortlist = 15;
+  // Each row is one model; runs holds one { index, message, data } per request.
+  let lastRun = { messages: [], repeats: 1, rows: [] };
+  // Expected intent for each example. alsoAccepted lists labels that are equally defensible;
+  // intent: null means no intent fits, so abstaining is the correct outcome.
+  const examples = [
+    { text: "My bank transfer is still pending. When will it arrive?", intent: "pending_transfer", alsoAccepted: ["transfer_timing"] },
+    { text: "My money hasn't reached my friend yet", intent: "transfer_not_received_by_recipient" },
+    { text: "I lost my card yesterday", intent: "lost_or_stolen_card" },
+    { text: "When will my new card arrive?", intent: "card_arrival", alsoAccepted: ["card_delivery_estimate"] },
+    { text: "Why was I charged a fee?", intent: "extra_charge_on_statement", alsoAccepted: ["card_payment_fee_charged", "transfer_fee_charged"] },
+    { text: "hello", intent: null },
+  ];
+
+  function expectedFor(message) {
+    return examples.find((example) => example.text === message) || null;
+  }
+
+  function describeExpected(expected) {
+    if (!expected) return "";
+    if (!expected.intent) return "none of the 77 (should abstain)";
+    return expected.alsoAccepted ? `${expected.intent} (also accepted: ${expected.alsoAccepted.join(", ")})` : expected.intent;
+  }
+
+  // Returns null when the message is not a known example.
+  function judge(data, expected) {
+    if (!expected || !data || data.error) return null;
+    const scores = Array.isArray(data.allScores) ? data.allScores : [];
+    const top = scores.slice(0, 2).map((item) => item.label);
+    if (!expected.intent) {
+      return data.abstained ? { ok: true, text: "✓ abstained" } : { ok: false, text: "✗ should abstain" };
+    }
+    const accepted = [expected.intent, ...(expected.alsoAccepted || [])];
+    if (accepted.includes(top[0])) return { ok: true, text: top[0] === expected.intent ? "✓" : "✓ accepted alt" };
+    return { ok: false, text: accepted.includes(top[1]) ? "✗ (right in 2nd)" : "✗" };
+  }
+
+  for (const { text } of examples) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = text;
+    button.onclick = () => { $("message").value = text; updateSelection(); runSelected(); };
+    $("examples").append(button);
+  }
+  const allExamples = document.createElement("button");
+  allExamples.type = "button";
+  allExamples.className = "all-examples";
+  allExamples.textContent = "All examples, one per line";
+  allExamples.onclick = () => { $("message").value = examples.map((example) => example.text).join("\n"); updateSelection(); };
+  $("examples").append(allExamples);
+
+  for (const id of ["threshold", "margin"]) {
+    $(id).addEventListener("input", () => { $(id + "Value").textContent = Number($(id).value).toFixed(2); });
+  }
+
+  $("controlPanel").addEventListener("change", updateSelection);
+  $("controlPanel").addEventListener("input", updateSelection);
+  $("message").addEventListener("input", updateSelection);
+  $("run").addEventListener("click", runSelected);
+  $("viewCards").addEventListener("click", () => setView("cards"));
+  $("viewTable").addEventListener("click", () => setView("table"));
+  $("downloadCsv").addEventListener("click", downloadCsv);
+  $("fullSize").addEventListener("click", () => setFullSize(true));
+  $("closeFull").addEventListener("click", () => setFullSize(false));
+  $("printTable").addEventListener("click", () => window.print());
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.body.classList.contains("table-full")) setFullSize(false);
+  });
+  $("message").addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); runSelected(); }
+  });
+
+  function messagesFromInput() {
+    return $("message").value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  }
+
+  function readInt(id, min, max) {
+    const value = Math.round(Number($(id).value));
+    return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : min;
+  }
+
+  function updateSelection() {
+    const selected = Array.from(document.querySelectorAll('#controlPanel input[data-kind]:checked'));
+    const perModel = messagesFromInput().length * readInt("repeats", 1, 50);
+    $("run").disabled = running || !selected.length;
+    $("run").textContent = `Run selected (${selected.length})`;
+    $("requestCount").textContent = perModel > 1
+      ? `${perModel} requests per model · ${perModel * selected.length} for the current selection`
+      : "";
+  }
+
+  async function loadModels() {
+    try {
+      const response = await fetch("/models");
+      if (!response.ok) throw new Error(`Model list request failed (${response.status})`);
+      const data = await response.json();
+      const embeddings = Array.isArray(data.embeddingModels) && data.embeddingModels.length
+        ? data.embeddingModels : modelFallback;
+      const selectedEmbedding = document.querySelector('#embeddingOptions input:checked')?.value;
+      $("embeddingOptions").replaceChildren(...embeddings.map((name) => makeModelOption("local", name, name, name === selectedEmbedding)));
+      $("embeddingCount").textContent = `${embeddings.length} available`;
+
+      if (data.jevShortlist) {
+        jevShortlist = data.jevShortlist;
+        $("jevShortlistLabel").textContent = jevLabel("jev-shortlist");
+      }
+
+      const llmModels = Array.isArray(data.llmModels) ? data.llmModels : [];
+      $("openaiOptions").replaceChildren(...llmModels.map((name) => makeModelOption("openai", name, name)));
+      $("openaiCount").textContent = `${llmModels.length} available`;
+      $("openaiStatus").textContent = data.llmError || "";
+      if (!llmModels.length && !data.llmError) {
+        $("openaiOptions").innerHTML = '<p class="hint">No frontier text models are available to this key.</p>';
+      }
+      updateSelection();
+    } catch (error) {
+      $("openaiCount").textContent = "unavailable";
+      $("openaiStatus").textContent = `Could not load the model list: ${error.message}`;
+      updateSelection();
+    }
+  }
+
+  function makeModelOption(kind, value, label, checked = false) {
+    const wrapper = document.createElement("label");
+    wrapper.className = "model-option";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.dataset.kind = kind;
+    input.value = value;
+    input.checked = checked;
+    const name = document.createElement("span");
+    name.textContent = label;
+    wrapper.append(input, name);
+    return wrapper;
+  }
+
+  function jevLabel(value) {
+    return value === "jev-shortlist" ? `TypeSafe JEV · top ${jevShortlist} shortlist` : "TypeSafe JEV · all 77 intents";
+  }
+
+  function collectSelectedModels() {
+    return Array.from(document.querySelectorAll('#controlPanel input[data-kind]:checked'))
+      .map((input) => ({
+        kind: input.dataset.kind,
+        model: input.value,
+        label: input.dataset.kind === "local" ? `Local · ${input.value}`
+          : input.dataset.kind === "openai" ? `OpenAI · ${input.value}` : jevLabel(input.value),
+      }));
+  }
+
+  function makeRow(item, isTop, type) {
+    const row = document.createElement("div");
+    row.className = "bar-row" + (isTop ? " top" : "");
+    const label = document.createElement("span");
+    label.className = "bar-label";
+    label.textContent = item.label || item.intent || "Unknown intent";
+    const score = document.createElement("span");
+    score.className = "score";
+    score.textContent = Number(item.score || 0).toFixed(3);
+    const track = document.createElement("div");
+    track.className = "bar-track";
+    const fill = document.createElement("div");
+    fill.className = "bar-fill";
+    fill.style.width = `${Math.max(0, Math.min(1, Number(item.score || 0))) * 100}%`;
+    track.append(fill);
+    row.append(label, score, track);
+    if (type === "openai" && item.sentence) {
+      const rationale = document.createElement("p");
+      rationale.className = "bar-rationale";
+      rationale.textContent = item.sentence;
+      row.append(rationale);
+    }
+    return row;
+  }
+
+  // Latency of the successful requests; p50/p95 use the nearest-rank method.
+  function latencyStats(runs) {
+    const values = runs.filter(({ data }) => !data.error && data.latencyMs != null)
+      .map(({ data }) => data.latencyMs).sort((a, b) => a - b);
+    if (!values.length) return null;
+    const rank = (p) => values[Math.min(values.length - 1, Math.max(0, Math.ceil(p * values.length) - 1))];
+    return {
+      n: values.length,
+      avg: values.reduce((sum, value) => sum + value, 0) / values.length,
+      min: values[0],
+      max: values[values.length - 1],
+      p50: rank(0.5),
+      p95: rank(0.95),
+    };
+  }
+
+  function renderResult(selection, runs) {
+    const card = document.createElement("article");
+    card.className = `result-card ${selection.kind}`;
+    const title = document.createElement("h3");
+    title.textContent = selection.label;
+    card.append(title);
+
+    const succeeded = runs.filter(({ data }) => !data.error);
+    const { message, data } = succeeded[0] || runs[0];
+
+    if (runs.length > 1) {
+      const stats = latencyStats(runs);
+      const checks = runs.map((run) => judge(run.data, expectedFor(run.message))).filter(Boolean);
+      const batch = document.createElement("div");
+      batch.className = "batch-stats";
+      const parts = [`${runs.length} requests`];
+      if (stats) parts.push(`avg ${formatLatency(stats.avg)}`, `p50 ${formatLatency(stats.p50)}`, `p95 ${formatLatency(stats.p95)}`,
+        `min ${formatLatency(stats.min)} · max ${formatLatency(stats.max)}`);
+      if (checks.length) parts.push(`${checks.filter((check) => check.ok).length} of ${checks.length} correct`);
+      if (succeeded.length < runs.length) parts.push(`${runs.length - succeeded.length} failed`);
+      batch.textContent = parts.join(" · ");
+      card.append(batch);
+    }
+
+    if (data.error) {
+      const error = document.createElement("p");
+      error.className = "result-error";
+      error.textContent = data.error;
+      card.append(error);
+      appendDiagnostics(card, selection.kind, data);
+      return card;
+    }
+
+    if (lastRun.messages.length > 1) {
+      const shown = document.createElement("p");
+      shown.className = "expected-line";
+      shown.textContent = `Showing: “${message}”`;
+      card.append(shown);
+    }
+
+    const verdict = document.createElement("div");
+    verdict.className = `verdict${data.abstained ? " abstain" : ""}`;
+    verdict.append(data.abstained ? "Abstained · best guess" : "Predicted intent");
+    const prediction = document.createElement("strong");
+    prediction.textContent = data.predictedIntent || "No prediction";
+    verdict.append(prediction);
+    card.append(verdict);
+
+    const expected = expectedFor(message);
+    const verdictCheck = judge(data, expected);
+    if (verdictCheck) {
+      const line = document.createElement("p");
+      line.className = "expected-line";
+      line.textContent = `Expected: ${describeExpected(expected)}`;
+      const mark = document.createElement("span");
+      mark.className = `match ${verdictCheck.ok ? "yes" : "no"}`;
+      mark.textContent = verdictCheck.text;
+      line.append(mark);
+      card.append(line);
+    }
+
+    const metadata = document.createElement("div");
+    metadata.className = "result-meta";
+    metadata.textContent = `${data.model || "Model unavailable"} · ${Number(data.latencyMs || 0).toFixed(0)} ms${data.confidence == null ? "" : ` · confidence ${Number(data.confidence).toFixed(2)}`}${data.mock ? " · mock response" : ""}`;
+    card.append(metadata);
+    if (data.shortlistMs != null) card.append(shortlistWarning(data.shortlistMs));
+
+    const scores = Array.isArray(data.allScores) ? data.allScores : [];
+    const topScores = document.createElement("div");
+    topScores.append(...scores.slice(0, 5).map((item, index) => makeRow(item, index === 0, selection.kind)));
+    card.append(topScores);
+    if (scores.length > 5) {
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = `Show all ${scores.length} intent scores`;
+      const allScores = document.createElement("div");
+      allScores.append(...scores.slice(5).map((item) => makeRow(item, false, selection.kind)));
+      details.append(summary, allScores);
+      card.append(details);
+    }
+    if (runs.length > 1) card.append(runList(runs));
+    appendDiagnostics(card, selection.kind, data);
+    return card;
+  }
+
+  function shortlistWarning(ms) {
+    const warning = document.createElement("p");
+    warning.className = "latency-warning";
+    warning.textContent = `⚠ Latency includes ${formatLatency(ms)} of local pre-processing (embedding shortlist) before the JEV call.`;
+    return warning;
+  }
+
+  function runList(runs) {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = `Show all ${runs.length} requests`;
+    const list = document.createElement("ol");
+    list.className = "run-list";
+    for (const run of runs) {
+      const item = document.createElement("li");
+      const check = judge(run.data, expectedFor(run.message));
+      item.textContent = run.data.error
+        ? `${run.message} → error: ${run.data.error}`
+        : `${run.message} → ${run.data.predictedIntent}${run.data.abstained ? " (abstained)" : ""} · ${formatLatency(run.data.latencyMs)}`;
+      if (check) {
+        const mark = document.createElement("span");
+        mark.className = `match ${check.ok ? "yes" : "no"}`;
+        mark.textContent = ` ${check.text}`;
+        item.append(mark);
+      }
+      list.append(item);
+    }
+    details.append(summary, list);
+    return details;
+  }
+
+  function appendDiagnostics(card, kind, data) {
+    if (kind === "jev" || kind === "openai") {
+      const diagnosticsData = kind === "jev" ? data.jevDiagnostics : data.openaiDiagnostics;
+      if (!diagnosticsData) return;
+      const diagnostics = document.createElement("details");
+      diagnostics.className = "jev-diagnostics";
+      const summary = document.createElement("summary");
+      summary.textContent = kind === "jev"
+        ? (data.mock ? "Why JEV used a fallback" : "Show raw JEV API response")
+        : "Show OpenAI response details";
+      const response = document.createElement("pre");
+      response.textContent = JSON.stringify(diagnosticsData, null, 2);
+      diagnostics.append(summary, response);
+      card.append(diagnostics);
+    }
+  }
+
+  async function classify(selection, message) {
+    const body = {
+      message,
+      threshold: Number($("threshold").value),
+      margin: Number($("margin").value),
+      classifier: selection.kind,
+      embedding_model: selection.kind === "local" ? selection.model : modelFallback[0],
+      llm_model: selection.kind === "openai" ? selection.model : null,
+      jev_shortlist: selection.kind === "jev" && selection.model === "jev-shortlist",
+    };
+    const started = performance.now();
+    try {
+      const response = await fetch("/classify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : response.statusText);
+      if (data.latencyMs == null) data.latencyMs = performance.now() - started;
+      return data;
+    } catch (error) {
+      return { error: error.message };
+    }
+  }
+
+  async function runClassifications(selections) {
+    if (running) return;
+    const messages = messagesFromInput();
+    if (!messages.length) {
+      $("status").className = "status error";
+      $("status").textContent = "Enter a customer message first.";
+      $("message").focus();
+      return;
+    }
+    if (!selections.length) {
+      $("status").className = "status error";
+      $("status").textContent = "Select at least one model to run.";
+      return;
+    }
+
+    const repeats = readInt("repeats", 1, 50);
+    const parallel = readInt("parallel", 1, 10);
+    const jobs = [];
+    for (let repeat = 0; repeat < repeats; repeat += 1) jobs.push(...messages);
+
+    running = true;
+    $("run").disabled = true;
+    $("status").className = "status";
+    $("status").textContent = `Preparing ${selections.length} model${selections.length === 1 ? "" : "s"} · ${jobs.length} request${jobs.length === 1 ? "" : "s"} each…`;
+    $("emptyState").hidden = true;
+    $("downloadCsv").disabled = true;
+    lastRun = { messages, repeats, rows: selections.map((selection) => ({ selection, runs: [], total: jobs.length })) };
+    setView(currentView);
+    const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+    let summary = `${plural(selections.length, "model")} · ${messages.length === 1 ? "same message" : plural(messages.length, "message")}`;
+    if (repeats > 1) summary += ` × ${repeats} repeats`;
+    if (parallel > 1) summary += ` · ${parallel} in parallel`;
+    const expected = messages.length === 1 ? expectedFor(messages[0]) : null;
+    if (expected) summary += ` · expected: ${describeExpected(expected)}`;
+    $("resultSummary").textContent = summary;
+    const quoted = messages.map((message) => `“${message}”`).join(", ");
+    $("printMeta").textContent = `Run ${new Date().toLocaleString()} · ${messages.length === 1 ? "Message" : "Messages"}: ${quoted}`;
+    $("fullSize").disabled = false;
+    const cards = selections.map((selection) => {
+      const card = document.createElement("article");
+      card.className = `result-card ${selection.kind}`;
+      card.textContent = `Waiting · ${selection.label}`;
+      return card;
+    });
+    $("resultGrid").replaceChildren(...cards);
+
+    let completed = 0;
+    const execute = async (index) => {
+      const row = lastRun.rows[index];
+      const { selection } = row;
+      let next = 0;
+      cards[index].textContent = `Running · ${selection.label}`;
+      const worker = async () => {
+        while (next < jobs.length) {
+          const jobIndex = next++;
+          const data = await classify(selection, jobs[jobIndex]);
+          row.runs.push({ index: jobIndex, message: jobs[jobIndex], data });
+          if (jobs.length > 1) cards[index].textContent = `Running · ${selection.label} · ${row.runs.length} of ${jobs.length}`;
+          renderTable();
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(parallel, jobs.length) }, worker));
+      row.runs.sort((a, b) => a.index - b.index);
+      const card = renderResult(selection, row.runs);
+      cards[index].replaceWith(card);
+      cards[index] = card;
+      renderTable();
+      completed += 1;
+      $("status").textContent = `Completed ${completed} of ${selections.length} · ${selection.label}`;
+    };
+
+    const localIndexes = selections.map((selection, index) => selection.kind === "local" ? index : -1).filter((index) => index >= 0);
+    for (const index of localIndexes) await execute(index);
+
+    const remoteIndexes = selections.map((selection, index) => selection.kind === "local" ? -1 : index).filter((index) => index >= 0);
+    let nextRemote = 0;
+    const runRemoteWorker = async () => {
+      while (nextRemote < remoteIndexes.length) {
+        const index = remoteIndexes[nextRemote++];
+        await execute(index);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, remoteIndexes.length) }, runRemoteWorker));
+
+    $("status").textContent = "";
+    $("downloadCsv").disabled = false;
+    running = false;
+    updateSelection();
+  }
+
+  // Table-only page for reading at full width and printing; Escape or Close returns.
+  function setFullSize(on) {
+    document.body.classList.toggle("table-full", on);
+    if (on) setView("table");
+    $(on ? "closeFull" : "fullSize").focus();
+  }
+
+  function setView(view) {
+    currentView = view;
+    $("viewCards").setAttribute("aria-pressed", String(view === "cards"));
+    $("viewTable").setAttribute("aria-pressed", String(view === "table"));
+    const hasRun = lastRun.rows.length > 0;
+    $("resultGrid").hidden = !hasRun || view !== "cards";
+    $("tableView").hidden = !hasRun || view !== "table";
+    if (hasRun && view === "table") renderTable();
+  }
+
+  function modelName(selection, data) {
+    if (selection.kind !== "jev") return selection.model;
+    const scope = selection.model === "jev-shortlist" ? `top ${jevShortlist}` : "all 77";
+    return `${(data && data.model) || "TypeSafe JEV"} · ${scope}`;
+  }
+
+  function average(values) {
+    const present = values.filter((value) => value != null);
+    return present.length ? present.reduce((sum, value) => sum + value, 0) / present.length : null;
+  }
+
+  // One flat record per model (aggregated over its requests), used by the table.
+  function summarize({ selection, runs, total }) {
+    const succeeded = runs.filter(({ data }) => !data.error);
+    const data = succeeded.length ? succeeded[0].data : null;
+    const scores = data && Array.isArray(data.allScores) ? data.allScores : [];
+    let latencyDetail = "";
+    if (data && selection.kind === "local" && data.setupMs != null) {
+      latencyDetail = data.setupMs >= 1 ? `setup ${data.setupMs.toFixed(0)} ms excluded` : "model already loaded";
+    } else if (data && selection.kind !== "local") {
+      latencyDetail = data.setupMs >= 1 ? `API round trip · setup ${data.setupMs.toFixed(0)} ms excluded` : "API round trip";
+    }
+    const checks = runs.map((run) => judge(run.data, expectedFor(run.message))).filter(Boolean);
+    return {
+      kind: selection.kind,
+      model: modelName(selection, data),
+      pending: !runs.length,
+      done: runs.length,
+      total,
+      error: runs.length && !succeeded.length ? runs[0].data.error || "" : "",
+      failed: runs.length - succeeded.length,
+      mock: succeeded.some(({ data: item }) => item.mock),
+      abstained: Boolean(data && data.abstained),
+      top1: scores[0] || null,
+      top2: scores[1] || null,
+      inputTokens: average(succeeded.map(({ data: item }) => item.inputTokens)),
+      outputTokens: average(succeeded.map(({ data: item }) => item.outputTokens)),
+      reasoningTokens: average(succeeded.map(({ data: item }) => item.reasoningTokens || 0)) || 0,
+      latency: latencyStats(runs),
+      latencyDetail,
+      shortlistMs: average(succeeded.map(({ data: item }) => item.shortlistMs)),
+      correct: checks.filter((check) => check.ok).length,
+      checked: checks.length,
+      check: runs.length === 1 ? checks[0] || null : null,
+    };
+  }
+
+  function formatLatency(ms) {
+    if (ms == null) return "—";
+    return ms < 10 ? `${ms.toFixed(2)} ms` : `${ms.toFixed(0)} ms`;
+  }
+
+  function formatTokens(value) {
+    return value == null ? null : Math.round(value).toLocaleString();
+  }
+
+  function cell(text, className, sub, title) {
+    const td = document.createElement("td");
+    if (className) td.className = className;
+    td.textContent = text;
+    if (sub) {
+      const small = document.createElement("span");
+      small.className = "sub-value";
+      small.textContent = sub;
+      td.append(small);
+    }
+    if (title) td.title = title;
+    return td;
+  }
+
+  function intentCell(item, note) {
+    if (!item) return cell("—");
+    const td = cell("", "", `score ${Number(item.score || 0).toFixed(3)}${note ? ` · ${note}` : ""}`);
+    const name = document.createElement("span");
+    name.className = "intent";
+    name.textContent = item.label || item.intent || "Unknown";
+    td.prepend(name);
+    return td;
+  }
+
+  function renderTable() {
+    const rows = lastRun.rows.map(summarize);
+    const multiMessage = lastRun.messages.length > 1;
+    $("tableBody").replaceChildren(...rows.map((row) => {
+      const tr = document.createElement("tr");
+      const modelCell = document.createElement("td");
+      modelCell.className = "model-cell";
+      const tag = document.createElement("span");
+      tag.className = `kind-tag ${row.kind}`;
+      tag.textContent = row.kind === "local" ? "Embedding" : row.kind === "jev" ? "JEV" : "OpenAI";
+      modelCell.append(tag, row.model);
+      const notes = [
+        [row.total > 1, `${row.done} of ${row.total} requests${row.failed ? ` · ${row.failed} failed` : ""}`],
+        [row.abstained && !multiMessage, "abstained · best guess shown"],
+        [row.mock, "mock response"],
+      ];
+      for (const [flag, text] of notes) {
+        if (!flag) continue;
+        const note = document.createElement("span");
+        note.className = "sub-value abstain-tag";
+        note.textContent = text;
+        modelCell.append(note);
+      }
+      tr.append(modelCell);
+
+      if (row.pending || row.error) {
+        const td = cell(row.pending ? "Running…" : row.error, row.error ? "result-error" : "hint");
+        td.colSpan = 6;
+        tr.append(td);
+        return tr;
+      }
+
+      let checkCell;
+      if (row.check) checkCell = cell(row.check.text, `match ${row.check.ok ? "yes" : "no"}`);
+      else if (row.checked) checkCell = cell(`${row.correct} of ${row.checked}`, `match ${row.correct === row.checked ? "yes" : "no"}`);
+      else checkCell = cell("—", "hint", "", "Not a known example message");
+
+      const many = row.done > 1;
+      const stats = row.latency;
+      const latencyCell = cell(formatLatency(stats && stats.avg), "num",
+        many && stats ? `avg · p50 ${formatLatency(stats.p50)} · p95 ${formatLatency(stats.p95)}` : row.latencyDetail,
+        many && stats ? `${row.latencyDetail} · min ${formatLatency(stats.min)} · max ${formatLatency(stats.max)}` : "");
+      if (row.shortlistMs != null) {
+        const warning = document.createElement("span");
+        warning.className = "sub-value abstain-tag";
+        warning.textContent = `⚠ incl. ${formatLatency(row.shortlistMs)}${many ? " avg" : ""} local shortlist step`;
+        latencyCell.append(warning);
+      }
+      tr.append(
+        intentCell(row.top1, multiMessage ? "first message" : ""),
+        intentCell(row.top2, multiMessage ? "first message" : ""),
+        checkCell,
+        cell(formatTokens(row.inputTokens) ?? "—", "num",
+          row.kind === "local" ? "message only" : many ? "avg per request" : ""),
+        cell(formatTokens(row.outputTokens) ?? "n/a", "num",
+          row.reasoningTokens ? `${formatTokens(row.reasoningTokens)} reasoning` : ""),
+        latencyCell,
+      );
+      return tr;
+    }));
+
+    const done = rows.filter((row) => !row.pending && !row.error);
+    const checked = done.reduce((sum, row) => sum + row.checked, 0);
+    const correct = done.reduce((sum, row) => sum + row.correct, 0);
+    const requests = rows.reduce((sum, row) => sum + row.done, 0);
+    const label = cell(`Total · ${done.length} of ${rows.length} models · ${requests.toLocaleString()} requests${checked ? ` · ${correct} of ${checked} correct` : ""}`);
+    label.colSpan = 7;
+    const foot = document.createElement("tr");
+    foot.append(label);
+    $("tableFoot").replaceChildren(foot);
+  }
+
+  // One CSV line per request, so averages and percentiles can be recomputed elsewhere.
+  function downloadCsv() {
+    const header = ["message", "model_type", "model", "request_no", "top1_intent", "top1_score", "top2_intent", "top2_score",
+      "expected_intent", "correct", "abstained", "input_tokens", "output_tokens", "reasoning_tokens", "latency_ms", "shortlist_ms_included",
+      "setup_ms_excluded", "error"];
+    const lines = [header];
+    for (const { selection, runs } of lastRun.rows) {
+      runs.forEach(({ message, data }, index) => {
+        const scores = Array.isArray(data.allScores) ? data.allScores : [];
+        const expected = expectedFor(message);
+        const check = judge(data, expected);
+        lines.push([
+          message, selection.kind, modelName(selection, data), index + 1,
+          scores[0] ? scores[0].label : "", scores[0] ? Number(scores[0].score).toFixed(4) : "",
+          scores[1] ? scores[1].label : "", scores[1] ? Number(scores[1].score).toFixed(4) : "",
+          describeExpected(expected), check ? check.text : "",
+          data.error ? "" : data.abstained ? "yes" : "no",
+          data.inputTokens ?? "", data.outputTokens ?? "", data.reasoningTokens || "",
+          data.error || data.latencyMs == null ? "" : data.latencyMs.toFixed(2),
+          data.shortlistMs != null ? data.shortlistMs.toFixed(2) : "",
+          data.setupMs != null ? data.setupMs.toFixed(2) : "",
+          data.error || "",
+        ]);
+      });
+    }
+    const csv = lines.map((line) => line.map((value) => {
+      const text = String(value);
+      return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }).join(",")).join("\r\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" }));
+    link.download = `intent-comparison-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 0);
+  }
+
+  function runSelected() {
+    return runClassifications(collectSelectedModels());
+  }
+
+  updateSelection();
+  loadModels();
+</script>
+</body>
+</html>

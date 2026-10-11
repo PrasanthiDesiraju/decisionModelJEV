@@ -1,0 +1,22 @@
+# Secrets: never commit real API keys. Use .env.example as the template.
+.env
+
+# Downloaded embedding models (hundreds of MB; re-downloaded automatically)
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+documents/
+# Duplicate copy of the architecture diagram
+Choosing the Right AI Architecture (1).png
