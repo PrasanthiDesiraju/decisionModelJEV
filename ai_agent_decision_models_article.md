@@ -151,13 +151,13 @@ All the details & results can be found at
 
 ## Where I Landed/Learned
 
-LLMs are probably the closest thing to a magic wand we've had in a while and replacing that would need careful evaluation and additional deterministic flow incoporated. 
+LLMs are probably the closest thing to a magic wand we’ve had in a while. But every wave of the wand comes with a token bill.
 
-But since the LLM magic comes with a token bill! :), we are reaching a point where we need carefully evaluate component of architecuture, jsut like a block of Jenga.
+This was one experiment with one specialized model, so I wouldn’t call it a conclusion. It still picked the same intent as two frontier LLMs and answered about ten times faster. Whether it’s cheaper depends on its per-token price, which is worth calculating per call.
 
-The answer isn't to replace every classifier with an LLM, or every LLM with a specialized decision model. It's about learning, unlearning, and relearning as technology evolves.
+What it did change is how I look at agent design. Not every step needs the most powerful model available. For narrow, well-defined decisions, task-specific options may be faster, more predictable, and good enough. 
 
-And perhaps that's an important part of building the next generation of enterprise AI agents is to choose the right optimal tools.
+I suspect we’ll see more of this: LLMs used where their flexibility pays off, and lighter, purpose-built models doing the rest.
 
 ---
 
