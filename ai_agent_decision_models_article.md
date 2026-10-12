@@ -137,7 +137,7 @@ In any enterprise, so much starts with the voice of a customer or supplier: an e
 
 And the challenge isn't always understanding what they're saying. It's deciding what to do next.
 
-I chose the public **BANKING77 dataset** because its 77 banking intents offer an interesting classification challenge. Customer requests can sound very similar while representing different intents.
+I chose the public BANKING77 dataset because its 77 intents come from real customer messages, many of which sound alike but need different handling. It’s a good stand-in for step 1 of the sales order example: understanding what the customer actually wants.
 
 So I built a small application that takes the same customer message and compares three approaches side by side:
 
