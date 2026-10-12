@@ -149,7 +149,7 @@ All the details & results can be found at
 
 **GitHub:** [https://github.com/PrasanthiDesiraju/decisionModelJEV.git] ( A simple exploration of accuracy, latency, and cost—and how evolving models might reveal new trade-offs and opportunities )
 
-## Where I Landed/Learned
+## My Learnings
 
 LLMs are probably the closest thing to a magic wand we’ve had in a while. But every wave of the wand comes with a token bill.
 
