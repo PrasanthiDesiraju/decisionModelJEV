@@ -165,7 +165,7 @@ The measurements will help answer those questions.
 
 I'll share the implementation, evaluation methodology, and results on GitHub.
 
-**GitHub:** [https://github.com/PrasanthiDesiraju/decisionModelJEV.git]
+**GitHub:** [https://github.com/PrasanthiDesiraju/decisionModelJEV.git] ( A simple exploration of accuracy, latency, and cost—and how evolving models might reveal new trade-offs and opportunities )
 
 ## Where I Landed
 
