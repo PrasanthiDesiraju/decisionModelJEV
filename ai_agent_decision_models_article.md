@@ -145,45 +145,19 @@ So I built a small application that takes the same customer message and compares
 2. **TypeSafe Jev** — using a specialized decision model to select from predefined intent categories.
 3. **OpenAI models** — using an LLM-based approach to classify the request.
 
-The objective is to compare **classification accuracy, latency, and cost** across these approaches.
-
-| Approach | Accuracy | Average latency | Cost per 1,000 requests |
-|---|---|---|---|
-| Local embeddings | To be measured | To be measured | To be measured |
-| TypeSafe Jev | To be measured | To be measured | To be measured |
-| OpenAI models | To be measured | To be measured | To be measured |
-
-This is a focused intent-classification experiment, not a complete multi-step agent.
-
-But intent classification is one of the decisions an agent may need to make. It provides a useful starting point for exploring whether every decision requires a generative model.
-
-I'm particularly interested in the trade-offs.
-
-Does a specialized decision model deliver comparable accuracy with lower latency or cost? Can local embeddings achieve similar results without an external model call? And when does the additional flexibility of an LLM justify its overhead?
-
-The measurements will help answer those questions.
-
-I'll share the implementation, evaluation methodology, and results on GitHub.
+All the details & results can be found at 
 
 **GitHub:** [https://github.com/PrasanthiDesiraju/decisionModelJEV.git] ( A simple exploration of accuracy, latency, and cost—and how evolving models might reveal new trade-offs and opportunities )
 
-## Where I Landed
+## Where I Landed/Learned
 
-LLMs are probably the closest thing to a magic wand we've had in a while.
+LLMs are probably the closest thing to a magic wand we've had in a while and replacing that would need careful evaluation and additional deterministic flow incoporated. 
 
-But even magic comes with a token bill! :)
+But since the LLM magic comes with a token bill! :), we are reaching a point where we need carefully evaluate component of architecuture, jsut like a block of Jenga.
 
-The answer isn't to replace every classifier with an LLM, or every LLM with a specialized decision model.
+The answer isn't to replace every classifier with an LLM, or every LLM with a specialized decision model. It's about learning, unlearning, and relearning as technology evolves.
 
-It's about learning, unlearning, and relearning as technology evolves.
-
-I think of architecture a little like Jenga. Every piece has its place, and every choice affects the stability of the overall structure.
-
-Sometimes the smartest decision is knowing which piece you don't need.
-
-**The goal was never to use the smartest model. It's to choose the right intelligence for the job.**
-
-And perhaps that's an important part of building the next generation of enterprise AI agents.
+And perhaps that's an important part of building the next generation of enterprise AI agents is to choose the right optimal tools.
 
 ---
 
