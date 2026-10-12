@@ -131,7 +131,7 @@ And if a decision requires deeper reasoning, complex context, or open-ended gene
 
 The answer should come from evidence, not assumptions.
 
-## My Learnings: Putting the Idea into Practice
+## Putting the Idea into Practice
 
 In any enterprise, so much starts with the voice of a customer or supplier: an email, a chat, a ticket, someone who needs an answer.
 
@@ -149,7 +149,7 @@ All the details & results can be found at
 
 **GitHub:** [https://github.com/PrasanthiDesiraju/decisionModelJEV.git] ( A simple exploration of accuracy, latency, and cost—and how evolving models might reveal new trade-offs and opportunities )
 
-## My Learnings
+### My Learnings
 
 LLMs are probably the closest thing to a magic wand we’ve had in a while. But every wave of the wand comes with a token bill.
 
